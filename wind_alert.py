@@ -1,18 +1,23 @@
 import os
-import smtplib
 import urllib.request
 import urllib.parse
 import json
-from email.mime.text import MIMEText
 from datetime import datetime, timezone
 
+# Load .env file when running locally
+if os.path.exists(".env"):
+    with open(".env") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
+
 # --- Config (set these as GitHub Secrets/Variables) ---
-WEATHER_API_KEY    = os.environ["WEATHER_API_KEY"]
-LOCATION           = os.environ.get("LOCATION", "San Luis Obispo, CA")
-THRESHOLD_MPH      = float(os.environ.get("THRESHOLD_MPH", "20"))
-GMAIL_ADDRESS      = os.environ["GMAIL_ADDRESS"]
-GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
-SMS_ADDRESS        = os.environ["SMS_ADDRESS"]
+WEATHER_API_KEY = os.environ["WEATHER_API_KEY"]
+LOCATION        = os.environ.get("LOCATION", "San Luis Obispo, CA")
+THRESHOLD_MPH   = float(os.environ.get("THRESHOLD_MPH", "20"))
+NTFY_TOPIC      = os.environ.get("NTFY_TOPIC", "wind-alert-tunas-house")
 
 ALERT_STATE_FILE = "last_alert_date.txt"
 
@@ -45,22 +50,25 @@ def get_wind():
         "city":      f"{location['name']}, {location['region']}",
     }
 
-def send_sms(wind):
-    body = (
-        f"Wind alert! {wind['mph']:.0f} mph ({wind['direction']}) "
-        f"in {wind['city']} — above your {THRESHOLD_MPH:.0f} mph limit. "
-        f"Put the umbrella down!"
+def send_notification(wind):
+    title = f"Wind alert: {wind['mph']:.0f} mph in {wind['city']}"
+    body  = (
+        f"{wind['mph']:.0f} mph ({wind['direction']}), "
+        f"gusts up to {wind['gust_mph']:.0f} mph. "
+        f"Above your {THRESHOLD_MPH:.0f} mph limit — put the umbrella down!"
     )
-    msg = MIMEText(body, "plain")
-    msg["From"]    = GMAIL_ADDRESS
-    msg["To"]      = SMS_ADDRESS
-    msg["Subject"] = ""
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_ADDRESS, SMS_ADDRESS, msg.as_string())
-
-    print(f"SMS sent to {SMS_ADDRESS}")
+    req = urllib.request.Request(
+        f"https://ntfy.sh/{NTFY_TOPIC}",
+        data=body.encode("utf-8"),
+        headers={
+            "Title": title,
+            "Priority": "high",
+            "Tags": "wind_face",
+        },
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        print(f"Notification sent — status {resp.status}")
 
 def main():
     wind = get_wind()
@@ -70,8 +78,8 @@ def main():
         if already_alerted_today():
             print("Wind is high but already sent an alert today — skipping.")
         else:
-            print("Threshold exceeded — sending SMS alert...")
-            send_sms(wind)
+            print("Threshold exceeded — sending push notification...")
+            send_notification(wind)
             save_alert_date()
     else:
         print("Wind is within limit. No alert sent.")
