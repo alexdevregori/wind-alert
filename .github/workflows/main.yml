@@ -7,6 +7,9 @@ on:
 
 permissions:
   contents: write           # needed to commit the last_alert_date.txt file
+  
+env: 
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   check-wind:
