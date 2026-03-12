@@ -1,0 +1,40 @@
+name: Wind Speed Alert
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"  # every 3 hours
+  workflow_dispatch:        # lets you trigger manually from GitHub UI
+
+permissions:
+  contents: write           # needed to commit the last_alert_date.txt file
+
+jobs:
+  check-wind:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run wind alert
+        env:
+          WEATHER_API_KEY:    ${{ secrets.WEATHER_API_KEY }}
+          GMAIL_ADDRESS:      ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SMS_ADDRESS:        ${{ secrets.SMS_ADDRESS }}
+          LOCATION:           ${{ vars.LOCATION }}
+          THRESHOLD_MPH:      ${{ vars.THRESHOLD_MPH }}
+        run: python wind_alert.py
+
+      - name: Save alert state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add last_alert_date.txt || true
+          git diff --cached --quiet || git commit -m "Update last alert date"
+          git push || true
