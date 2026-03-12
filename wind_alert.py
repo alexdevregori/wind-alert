@@ -15,9 +15,9 @@ if os.path.exists(".env"):
 
 # --- Config (set these as GitHub Secrets/Variables) ---
 WEATHER_API_KEY = os.environ["WEATHER_API_KEY"]
-LOCATION        = os.environ.get("LOCATION", "San Luis Obispo, CA")
-THRESHOLD_MPH   = float(os.environ.get("THRESHOLD_MPH", "20"))
-NTFY_TOPIC      = os.environ.get("NTFY_TOPIC", "wind-alert-tunas-house")
+LOCATION        = os.environ.get("LOCATION")
+THRESHOLD_MPH   = float(os.environ.get("THRESHOLD_MPH"))
+NTFY_TOPIC      = os.environ.get("NTFY_TOPIC")
 
 ALERT_STATE_FILE = "last_alert_date.txt"
 
