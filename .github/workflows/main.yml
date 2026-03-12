@@ -24,11 +24,9 @@ jobs:
       - name: Run wind alert
         env:
           WEATHER_API_KEY:    ${{ secrets.WEATHER_API_KEY }}
-          GMAIL_ADDRESS:      ${{ secrets.GMAIL_ADDRESS }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          SMS_ADDRESS:        ${{ secrets.SMS_ADDRESS }}
-          LOCATION:           ${{ vars.LOCATION }}
-          THRESHOLD_MPH:      ${{ vars.THRESHOLD_MPH }}
+          NTFY_TOPIC:         ${{ secrets.NTFY_TOPIC }}
+          LOCATION:           ${{ secrets.LOCATION }}
+          THRESHOLD_MPH:      ${{ secrets.THRESHOLD_MPH }}
         run: python wind_alert.py
 
       - name: Save alert state
