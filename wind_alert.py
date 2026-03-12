@@ -4,7 +4,7 @@ import urllib.request
 import urllib.parse
 import json
 from email.mime.text import MIMEText
-from datetime import datetime
+from datetime import datetime, timezone
 
 # --- Config (set these as GitHub Secrets/Variables) ---
 WEATHER_API_KEY    = os.environ["WEATHER_API_KEY"]
@@ -12,17 +12,22 @@ LOCATION           = os.environ.get("LOCATION", "San Luis Obispo, CA")
 THRESHOLD_MPH      = float(os.environ.get("THRESHOLD_MPH", "20"))
 GMAIL_ADDRESS      = os.environ["GMAIL_ADDRESS"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+SMS_ADDRESS        = os.environ["SMS_ADDRESS"]
 
-# Your phone number + carrier gateway, e.g. 8055551234@txt.att.net
-# See carrier list below in comments
-SMS_ADDRESS = os.environ["SMS_ADDRESS"]
+ALERT_STATE_FILE = "last_alert_date.txt"
 
-# Carrier email-to-SMS gateways:
-# AT&T:      number@txt.att.net
-# T-Mobile:  number@tmomail.net
-# Verizon:   number@vtext.com
-# Sprint:    number@messaging.sprintpcs.com
-# US Mobile: number@usmobile.com
+def get_today():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+def already_alerted_today():
+    if not os.path.exists(ALERT_STATE_FILE):
+        return False
+    with open(ALERT_STATE_FILE) as f:
+        return f.read().strip() == get_today()
+
+def save_alert_date():
+    with open(ALERT_STATE_FILE, "w") as f:
+        f.write(get_today())
 
 def get_wind():
     url = (
@@ -38,21 +43,18 @@ def get_wind():
         "direction": current["wind_dir"],
         "gust_mph":  current["gust_mph"],
         "city":      f"{location['name']}, {location['region']}",
-        "time":      datetime.utcnow().strftime("%H:%M UTC"),
     }
 
 def send_sms(wind):
-    # Keep under 160 chars so it arrives as a single text
     body = (
         f"Wind alert! {wind['mph']:.0f} mph ({wind['direction']}) "
         f"in {wind['city']} — above your {THRESHOLD_MPH:.0f} mph limit. "
         f"Put the umbrella down!"
     )
-
     msg = MIMEText(body, "plain")
     msg["From"]    = GMAIL_ADDRESS
     msg["To"]      = SMS_ADDRESS
-    msg["Subject"] = ""  # blank subject — shows as part of SMS body on most carriers
+    msg["Subject"] = ""
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
@@ -65,8 +67,12 @@ def main():
     print(f"Wind in {wind['city']}: {wind['mph']:.1f} mph (threshold: {THRESHOLD_MPH} mph)")
 
     if wind["mph"] > THRESHOLD_MPH:
-        print("Threshold exceeded — sending SMS alert...")
-        send_sms(wind)
+        if already_alerted_today():
+            print("Wind is high but already sent an alert today — skipping.")
+        else:
+            print("Threshold exceeded — sending SMS alert...")
+            send_sms(wind)
+            save_alert_date()
     else:
         print("Wind is within limit. No alert sent.")
 
