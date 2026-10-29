@@ -40,7 +40,6 @@ def get_wind():
         f"?key={WEATHER_API_KEY}&q={urllib.parse.quote(LOCATION)}&aqi=no"
     )
     print(f"DEBUG: LOCATION='{LOCATION}'")
-    print(f"DEBUG: URL={url}")
     with urllib.request.urlopen(url, timeout=10) as resp:
         data = json.loads(resp.read())
     current  = data["current"]
